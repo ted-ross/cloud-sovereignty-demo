@@ -1,0 +1,2 @@
+_TITLE="ONPREM"
+export KUBECONFIG=$HOME/kube/minikube0

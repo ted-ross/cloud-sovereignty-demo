@@ -1,0 +1,2 @@
+_TITLE="Zurich"
+export KUBECONFIG=$HOME/kube/ibm-skupper-0

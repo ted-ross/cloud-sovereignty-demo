@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License
+#
+
+##
+## This script creates the on-prem kubernetes site for pre-migrated workloads.
+## This site connects to the HUB and also has a router-access so the Podman site
+## can connect to it directly.
+##
+## This site is created in the current kubernetes context/namespace.
+##
+
+APIVERSION=v2alpha1
+
+if [ -v $1 ]; then
+    echo A site-name must be supplied
+    echo usage: $0 '<site-name>'
+    exit 1
+fi
+
+SITE=$1
+
+echo Create site ${SITE} in current namespace
+cat >temp <<EOF
+apiVersion: skupper.io/${APIVERSION}
+kind: Site
+metadata:
+  name: ${SITE}
+---
+apiVersion: skupper.io/${APIVERSION}
+kind: RouterAccess
+metadata:
+  name: ${SITE}-peer
+spec:
+  generateTlsCredentials: true
+  issuer: skupper-site-ca
+  roles:
+  - name: inter-router
+    port: 55671
+  tlsCredentials: skupper-site-server
+---
+apiVersion: skupper.io/${APIVERSION}
+kind: AccessGrant
+metadata:
+  name: ${SITE}-grant
+spec:
+  redemptionsAllowed: 10
+  expirationWindow: 24h
+---
+apiVersion: skupper.io/${APIVERSION}
+kind: Listener
+metadata:
+  name: processor-default
+spec:
+  routingKey: np
+  host: processor
+  port: 8000
+---
+apiVersion: skupper.io/${APIVERSION}
+kind: Listener
+metadata:
+  name: processor-gb
+spec:
+  routingKey: np-gb
+  host: processor-gb
+  port: 8000
+---
+apiVersion: skupper.io/${APIVERSION}
+kind: Listener
+metadata:
+  name: processor-ch
+spec:
+  routingKey: np-ch
+  host: processor-ch
+  port: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: country-dispatch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      application: country-dispatch
+  template:
+    metadata:
+      labels:
+        application: country-dispatch
+    spec:
+      containers:
+      - name: country-dispatch
+        image: quay.io/tedlross/country-dispatch:latest
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        ports:
+        - containerPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: process-dispatch
+spec:
+  ports:
+  - port: 8000
+    protocol: TCP
+  selector:
+    application: country-dispatch
+  type: ClusterIP
+EOF
+kubectl apply -f temp
+kubectl apply -f token-hub-a.yaml
+kubectl apply -f token-hub-b.yaml
+rm temp
+
+echo Generating access token token-${SITE}.yaml
+
+#
+# Wait for the access grant to achieve READY state.
+#
+kubectl wait --for=condition=ready accessgrant/${SITE}-grant
+
+#
+# Use the contents from the completed access grant to create an access token.
+#
+kubectl get accessgrant ${SITE}-grant -o yaml > temp
+URL=`cat temp | yq '.status.url'`
+CODE=`cat temp | yq '.status.code'`
+CA=`cat temp | yq -r '.status.ca' | awk '{ print "    " $0 }'`
+cat >token-${SITE}.yaml <<EOF
+apiVersion: skupper.io/${APIVERSION}
+kind: AccessToken
+metadata:
+  name: ${SITE}-token
+spec:
+  url: ${URL}
+  code: ${CODE}
+  ca: |
+${CA}
+EOF
+

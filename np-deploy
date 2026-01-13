@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License
+#
+
+##
+## This script deploys the nearestprime workload into the local kubernetes site along with the Skupper
+## endpoints needed to establish proper interconnect.
+##
+
+if [ -v $2 ]; then
+    echo usage: $0 '<city> <country-code>'
+    exit 1
+fi
+
+SITE=$1
+COUNTRY_CODE=$2
+APIVERSION=v2alpha1
+NAMESPACE=tross-site-${SITE}
+
+echo Deploying nearestprime into site: ${SITE}, Country Code: ${COUNTRY_CODE}, Namespace: ${NAMESPACE}
+
+cat >temp <<EOF
+apiVersion: skupper.io/${APIVERSION}
+kind: Listener
+metadata:
+  name: postgres
+spec:
+  routingKey: db
+  port: 5432
+  host: database
+---
+apiVersion: skupper.io/${APIVERSION}
+kind: Connector
+metadata:
+  name: processor-default
+spec:
+  routingKey: np
+  port: 8000
+  selector: application=nearestprime
+---
+apiVersion: skupper.io/${APIVERSION}
+kind: Connector
+metadata:
+  name: processor-sovereign
+spec:
+  routingKey: np-${COUNTRY_CODE}
+  port: 8000
+  selector: application=nearestprime
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nearestprime
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      application: nearestprime
+  template:
+    metadata:
+      labels:
+        application: nearestprime
+    spec:
+      containers:
+      - name: nearestprime
+        image: quay.io/tedlross/nearestprime:latest
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DDW_DATABASE
+          value: nearestprime
+        - name: DDW_USER
+          value: access
+        - name: DDW_PASSWORD
+          value: password
+        - name: DDW_HOST
+          value: database
+        - name: DDW_SITENAME
+          value: ${SITE}
+EOF
+
+kubectl apply -f temp -n ${NAMESPACE}
+rm temp

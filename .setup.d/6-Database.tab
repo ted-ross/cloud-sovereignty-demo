@@ -1,0 +1,3 @@
+_TITLE="Database"
+_DEMO_COMMAND="psql -d nearestprime -U demo -w"
+

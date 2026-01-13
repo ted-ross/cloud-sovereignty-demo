@@ -1,0 +1,32 @@
+#!/usr/bin/python
+
+import sys
+import httpx
+import asyncio
+
+PROXY_HOST = "10.111.56.51"
+
+async def fetch_data(url, countryCode):
+    async with httpx.AsyncClient() as client:
+        headers = {}
+        if countryCode:
+            headers['x-country-code'] = countryCode
+        response = await client.get(url, headers=headers)
+        return response.text
+
+async def main():
+    count   = int(sys.argv[1])
+    country = None
+    if len(sys.argv) > 2:
+        country = sys.argv[2]
+    base    = 0
+    tasks   = []
+
+    for i in range(count):
+        tasks.append(fetch_data("http://%s:8000/post_work?id=%d" % (PROXY_HOST, base + i), country))
+    results = await asyncio.gather(*tasks)
+    for result in results:
+        print(result)
+
+if __name__ == "__main__":
+    asyncio.run(main())

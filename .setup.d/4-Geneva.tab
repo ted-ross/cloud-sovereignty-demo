@@ -1,0 +1,2 @@
+_TITLE="Geneva"
+export KUBECONFIG=$HOME/kube/ibm-skupper-0

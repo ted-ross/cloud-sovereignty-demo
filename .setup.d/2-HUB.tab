@@ -1,0 +1,3 @@
+_TITLE="HUB"
+export KUBECONFIG=$HOME/kube/ibm-skupper-0
+export NP_NAMESPACE_PREFIX=tross

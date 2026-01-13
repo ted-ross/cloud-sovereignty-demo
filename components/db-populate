@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License
+#
+
+##
+## This script sets up and populates the database work table with large numbers to be processed.
+##
+
+import sys
+import os
+import psycopg2
+import random
+
+##
+## Minimum and Maximum values for the selected random numbers.
+##
+##   Higher numbers result in longer work-processing time
+##   Higher delta between min and max results in greater variance in work-processing time
+##
+VALUE_MIN = 1000000000
+VALUE_MAX = 2000000000
+
+class Setup(object):
+    '''
+    '''
+    def __init__(self, database, user, password, host, port):
+        '''
+        '''
+        self.conn = psycopg2.connect(database=database, user=user, password=password, host=host, port=port)
+
+    def close(self):
+        '''
+        '''
+        self.conn.close()
+
+    def drop_table(self):
+        '''
+        '''
+        print("Dropping table...")
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('DROP TABLE WORK;')
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+
+    def create_table(self):
+        '''
+        '''
+        print("Re-creating table...")
+        cursor = self.conn.cursor()
+        cursor.execute('''CREATE TABLE WORK (
+                id int PRIMARY KEY NOT NULL,
+                value int NOT NULL,
+                nearprime int,
+                processedby text,
+                fetchtime numeric(4,3),
+                computetime numeric(4,3)
+            );
+        ''')
+        self.conn.commit()
+
+    def fill_table(self, count):
+        '''
+        '''
+        print("Filling table...")
+        cursor = self.conn.cursor()
+        for id in range(count):
+            print(".", end="")
+            sys.stdout.flush()
+            value = random.randint(VALUE_MIN, VALUE_MAX)
+            cursor.execute('INSERT INTO WORK (ID, VALUE) VALUES (%ld, %ld);' % (id, value))
+            if id % 179 == 178:
+                print("C")
+                self.conn.commit()
+        print("C")
+        self.conn.commit()
+
+
+def main():
+    '''
+    The main function runs only if this module is directly executed (i.e. not
+    imported elsewhere as a library).
+    '''
+    database = os.getenv('DDW_DATABASE', 'nearestprime')
+    user     = os.getenv('DDW_USER',     'access')
+    password = os.getenv('DDW_PASSWORD', 'password')
+    host     = os.getenv('DDW_HOST',     '127.0.0.1')
+    port     = os.getenv('DDW_PORT',     '5432')
+
+    setup = Setup(database, user, password, host, port)
+    setup.drop_table()
+    setup.create_table()
+    setup.fill_table(10000)
+    setup.close()
+
+
+if __name__ == '__main__':
+    # Run as the main module, not imported
+    main()
