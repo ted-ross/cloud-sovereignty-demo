@@ -31,8 +31,12 @@ if [ -v $1 ]; then
     exit 1
 fi
 
+if [ ! -v DEMO_NAMESPACE_PREFIX ]; then
+    DEMO_NAMESPACE_PREFIX=npdemo
+fi
+
 SITE=$1
-NAMESPACE=tross-site-${SITE}
+NAMESPACE=${DEMO_NAMESPACE_PREFIX}-site-${SITE}
 
 echo Create site ${SITE} in ${NAMESPACE} namespace
 cat >temp <<EOF

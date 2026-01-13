@@ -29,10 +29,14 @@ if [ -v $2 ]; then
     exit 1
 fi
 
+if [ ! -v DEMO_NAMESPACE_PREFIX ]; then
+    DEMO_NAMESPACE_PREFIX=npdemo
+fi
+
 SITE=$1
 COUNTRY_CODE=$2
 APIVERSION=v2alpha1
-NAMESPACE=tross-site-${SITE}
+NAMESPACE=${DEMO_NAMESPACE_PREFIX}-site-${SITE}
 
 echo Deploying nearestprime into site: ${SITE}, Country Code: ${COUNTRY_CODE}, Namespace: ${NAMESPACE}
 

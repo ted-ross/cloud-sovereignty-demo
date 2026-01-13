@@ -7,17 +7,14 @@ To allow access to Podman for Skupper:
 
     $ systemctl --user enable podman.socket --now
 
-=====
 To setup and populate a local postgresql database:
 Note that the database setup (i.e. db-name, user, password, etc.) can be seen in the below code.
 
     $ components/db-populate
 
-=====
 To interact with the database:
     $ psql -d demo-db -U demo -w
 
-=====
 Bringing up the network on the following clusters:
 Hub-cluster (namespaces npdemo-hub-a, npdemo-hub-b)
 

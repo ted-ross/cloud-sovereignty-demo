@@ -23,16 +23,16 @@
 ## This script removes the two DMZ sites from the cluster.
 ##
 
-if [ ! -v NP_NAMESPACE_PREFIX ]; then
-    NP_NAMESPACE_PREFIX=npdemo
+if [ ! -v DEMO_NAMESPACE_PREFIX ]; then
+    DEMO_NAMESPACE_PREFIX=npdemo
 fi
 
 for i in hub-a hub-b;
 do
-kubectl delete accessgrant $i-grant -n ${NP_NAMESPACE_PREFIX}-$i
-kubectl delete routeraccess $i-peer -n ${NP_NAMESPACE_PREFIX}-$i
-kubectl delete site $i -n ${NP_NAMESPACE_PREFIX}-$i
+kubectl delete accessgrant $i-grant -n ${DEMO_NAMESPACE_PREFIX}-$i
+kubectl delete routeraccess $i-peer -n ${DEMO_NAMESPACE_PREFIX}-$i
+kubectl delete site $i -n ${DEMO_NAMESPACE_PREFIX}-$i
 rm token-$i.yaml
 done
 
-kubectl delete accesstoken hub-a-token -n ${NP_NAMESPACE_PREFIX}-hub-b
+kubectl delete accesstoken hub-a-token -n ${DEMO_NAMESPACE_PREFIX}-hub-b
