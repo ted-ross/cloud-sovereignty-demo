@@ -1,10 +1,11 @@
 #!/usr/bin/python
 
+import os
 import sys
 import httpx
 import asyncio
 
-PROXY_HOST = "10.111.56.51"
+PROXY_HOST = os.getenv('CSD_DISPATCH', 'csd-dispatch');
 
 async def fetch_data(url, countryCode):
     async with httpx.AsyncClient() as client:
